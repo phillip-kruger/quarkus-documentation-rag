@@ -1,0 +1,122 @@
+= REST Guide
+:categories: web
+:topics: rest, http, json
+:extensions: io.quarkus:quarkus-rest
+:summary: This guide explains how to build REST endpoints with Quarkus.
+
+This is the preamble paragraph.
+
+== Getting Started
+
+To create a REST endpoint, you need to add the `quarkus-rest` extension.
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.quarkus</groupId>
+    <artifactId>quarkus-rest</artifactId>
+</dependency>
+----
+
+=== Creating Your First Endpoint
+
+Create a simple Java class with JAX-RS annotations:
+
+[source,java]
+----
+@Path("/hello")
+public class GreetingResource {
+
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    public String hello() {
+        return "Hello from Quarkus REST";
+    }
+}
+----
+
+This endpoint will respond to HTTP GET requests at the `/hello` path.
+
+=== Running the Application
+
+Start your Quarkus application in dev mode:
+
+[source,bash]
+----
+mvn quarkus:dev
+----
+
+Then visit http://localhost:8080/hello in your browser.
+
+== JSON Serialization
+
+Quarkus uses Jackson for JSON serialization by default.
+
+=== Configuring Jackson
+
+You can configure Jackson using `application.properties`:
+
+[source,properties]
+----
+quarkus.jackson.fail-on-unknown-properties=true
+----
+
+NOTE: Jackson configuration can also be done programmatically using ObjectMapper.
+
+=== Custom Serializers
+
+To create a custom serializer, implement `JsonbSerializer` or use Jackson annotations.
+
+[source,java]
+----
+@JsonSerialize(using = CustomSerializer.class)
+public class MyObject {
+    private String name;
+    private int value;
+}
+----
+
+== Error Handling
+
+Quarkus provides several ways to handle errors in REST endpoints.
+
+TIP: Use exception mappers for clean error responses.
+
+=== Exception Mappers
+
+Create an exception mapper:
+
+[source,java]
+----
+@Provider
+public class NotFoundMapper implements ExceptionMapper<NotFoundException> {
+    @Override
+    public Response toResponse(NotFoundException exception) {
+        return Response.status(404)
+            .entity("Resource not found")
+            .build();
+    }
+}
+----
+
+== Testing
+
+Use REST Assured for testing your endpoints:
+
+[source,java]
+----
+@QuarkusTest
+public class GreetingResourceTest {
+
+    @Test
+    public void testHelloEndpoint() {
+        given()
+            .when().get("/hello")
+            .then()
+            .statusCode(200)
+            .body(is("Hello from Quarkus REST"));
+    }
+}
+----
+
+This is a small section.

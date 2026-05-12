@@ -1,0 +1,12 @@
+= Getting Started
+:categories: getting-started
+:topics: getting-started, first-app
+:summary: Create your first Quarkus application.
+
+== Prerequisites
+
+You need JDK 21 or later and Apache Maven 3.9 or later to develop Quarkus applications. Make sure both are installed and available on your PATH before proceeding with this guide.
+
+== Creating the Project
+
+Use the Quarkus Maven plugin to create a new project with all the required configuration and starter code already set up for you.

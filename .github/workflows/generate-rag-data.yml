@@ -1,0 +1,118 @@
+name: Generate RAG Data
+
+on:
+  workflow_dispatch:
+    inputs:
+      quarkus-version:
+        description: 'Quarkus version to generate RAG data for (e.g., 3.35.1)'
+        required: true
+
+permissions:
+  attestations: write
+  id-token: write
+  contents: read
+
+jobs:
+  generate-and-publish:
+    name: Generate and publish RAG data for Quarkus ${{ inputs.quarkus-version }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout quarkus-documentation-rag
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+          server-id: ossrh
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+
+      - name: Build plugin
+        run: ./mvnw -B install -DskipTests
+
+      - name: Clone Quarkus docs at ${{ inputs.quarkus-version }}
+        run: |
+          git clone --depth 1 --branch ${{ inputs.quarkus-version }} --single-branch \
+            https://github.com/quarkusio/quarkus.git /tmp/quarkus-docs
+
+      - name: Generate RAG SQL
+        run: |
+          mkdir -p /tmp/rag-output/META-INF
+          ./mvnw -B io.quarkus:quarkus-documentation-rag-maven-plugin:generate-rag \
+            -Dquarkus-rag.guidesDirectory=/tmp/quarkus-docs/docs/src/main/asciidoc \
+            -Dquarkus-rag.outputFile=/tmp/rag-output/META-INF/quarkus-rag-data.sql \
+            -Dquarkus-rag.version=${{ inputs.quarkus-version }} \
+            -pl quarkus-documentation-rag-maven-plugin
+
+      - name: Package RAG data artifact
+        run: |
+          cd /tmp/rag-output
+          jar cf /tmp/quarkus-documentation-core-rag-${{ inputs.quarkus-version }}.jar META-INF/
+
+          cat > /tmp/rag-pom.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <project xmlns="http://maven.apache.org/POM/4.0.0"
+                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>io.quarkus</groupId>
+              <artifactId>quarkus-documentation-core-rag</artifactId>
+              <version>${QUARKUS_VERSION}</version>
+              <name>Quarkus Documentation Core RAG Data</name>
+              <description>Aggregated RAG vector embeddings for core Quarkus documentation</description>
+              <url>https://github.com/quarkusio/quarkus-documentation-rag</url>
+              <licenses>
+                  <license>
+                      <name>Apache License, Version 2.0</name>
+                      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+                  </license>
+              </licenses>
+              <developers>
+                  <developer>
+                      <id>phillip-kruger</id>
+                      <name>Phillip Kruger</name>
+                  </developer>
+              </developers>
+              <scm>
+                  <connection>scm:git:https://github.com/quarkusio/quarkus-documentation-rag.git</connection>
+                  <url>https://github.com/quarkusio/quarkus-documentation-rag</url>
+              </scm>
+          </project>
+          EOF
+
+          sed -i "s/\${QUARKUS_VERSION}/${{ inputs.quarkus-version }}/g" /tmp/rag-pom.xml
+
+      - name: Generate source and javadoc JARs
+        run: |
+          # Maven Central requires source and javadoc JARs
+          jar cf /tmp/quarkus-documentation-core-rag-${{ inputs.quarkus-version }}-sources.jar -C /tmp/rag-output META-INF/
+          jar cf /tmp/quarkus-documentation-core-rag-${{ inputs.quarkus-version }}-javadoc.jar -C /tmp/rag-output META-INF/
+
+      - name: Publish to Maven Central
+        env:
+          MAVEN_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          mvn gpg:sign-and-deploy-file \
+            -Durl=https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/ \
+            -DrepositoryId=ossrh \
+            -DpomFile=/tmp/rag-pom.xml \
+            -Dfile=/tmp/quarkus-documentation-core-rag-${{ inputs.quarkus-version }}.jar \
+            -Dsources=/tmp/quarkus-documentation-core-rag-${{ inputs.quarkus-version }}-sources.jar \
+            -Djavadoc=/tmp/quarkus-documentation-core-rag-${{ inputs.quarkus-version }}-javadoc.jar
+
+      - name: Summary
+        run: |
+          CHUNK_COUNT=$(grep -c "INSERT INTO" /tmp/rag-output/META-INF/quarkus-rag-data.sql)
+          SQL_SIZE=$(du -h /tmp/rag-output/META-INF/quarkus-rag-data.sql | cut -f1)
+          echo "### RAG Data Generated" >> $GITHUB_STEP_SUMMARY
+          echo "- **Quarkus version**: ${{ inputs.quarkus-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Chunks**: ${CHUNK_COUNT}" >> $GITHUB_STEP_SUMMARY
+          echo "- **SQL size**: ${SQL_SIZE}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Artifact**: io.quarkus:quarkus-documentation-core-rag:${{ inputs.quarkus-version }}" >> $GITHUB_STEP_SUMMARY

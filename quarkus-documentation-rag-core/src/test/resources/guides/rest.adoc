@@ -1,0 +1,9 @@
+= REST Guide
+:categories: web
+:topics: rest, http
+:extensions: io.quarkus:quarkus-rest,io.quarkus:quarkus-rest-jackson
+:summary: Build REST endpoints.
+
+== Getting Started
+
+Create REST endpoints with Quarkus REST extension. This requires adding the quarkus-rest dependency to your project and then creating JAX-RS resource classes annotated with standard JAX-RS annotations.
