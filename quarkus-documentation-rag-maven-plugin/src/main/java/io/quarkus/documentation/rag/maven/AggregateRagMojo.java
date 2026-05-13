@@ -16,7 +16,7 @@ import io.quarkus.documentation.rag.SqlAggregator;
  * Aggregates multiple quarkus-rag.sql fragments from a directory tree
  * into a single SQL file with the schema preamble.
  */
-@Mojo(name = "aggregate-rag", defaultPhase = LifecyclePhase.PACKAGE)
+@Mojo(name = "aggregate-rag", defaultPhase = LifecyclePhase.PACKAGE, threadSafe = true)
 public class AggregateRagMojo extends AbstractMojo {
 
     @Parameter(required = true)
