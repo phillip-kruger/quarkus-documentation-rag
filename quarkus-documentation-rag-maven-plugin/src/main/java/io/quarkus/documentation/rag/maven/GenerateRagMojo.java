@@ -31,7 +31,7 @@ import io.quarkus.documentation.rag.RagPipeline;
  *       without the property are silently skipped.</li>
  * </ul>
  */
-@Mojo(name = "generate-rag", defaultPhase = LifecyclePhase.PROCESS_CLASSES)
+@Mojo(name = "generate-rag", defaultPhase = LifecyclePhase.PROCESS_CLASSES, threadSafe = true)
 public class GenerateRagMojo extends AbstractMojo {
 
     /**
