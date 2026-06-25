@@ -21,7 +21,7 @@ class RagPipelineTest {
         Path output = tempDir.resolve("rag.sql");
 
         try (RagPipeline pipeline = new RagPipeline(
-                "quarkus-rest", "3.21.0", "https://quarkus.io/guides", 1000)) {
+                "quarkus-rest", "3.21.0", "https://quarkus.io/guides", null, 1000)) {
             pipeline.processGuides(List.of(TEST_GUIDE), output);
         }
 
@@ -42,7 +42,7 @@ class RagPipelineTest {
     @Test
     void extensionModeTagsAllChunksWithFixedSource() {
         try (RagPipeline pipeline = new RagPipeline(
-                "quarkus-rest", "3.21.0", "https://quarkus.io/guides", 1000)) {
+                "quarkus-rest", "3.21.0", "https://quarkus.io/guides", null, 1000)) {
             var chunks = pipeline.processGuide(TEST_GUIDE);
 
             assertThat(chunks).isNotEmpty();
@@ -59,7 +59,7 @@ class RagPipelineTest {
         Path output = tempDir.resolve("rag.sql");
 
         try (RagPipeline pipeline = new RagPipeline(
-                null, "3.21.0", "https://quarkus.io/guides", 1000)) {
+                null, "3.21.0", "https://quarkus.io/guides", null, 1000)) {
             pipeline.processDirectory(GUIDES_DIR, output);
         }
 
@@ -73,7 +73,7 @@ class RagPipelineTest {
     @Test
     void directoryModeDerivesSourceFromExtensionsMetadata() {
         try (RagPipeline pipeline = new RagPipeline(
-                null, "3.21.0", "https://quarkus.io/guides", 1000)) {
+                null, "3.21.0", "https://quarkus.io/guides", null, 1000)) {
             // rest.adoc has :extensions: io.quarkus:quarkus-rest,io.quarkus:quarkus-rest-jackson
             var chunks = pipeline.processGuide(GUIDES_DIR.resolve("rest.adoc"));
 
@@ -85,7 +85,7 @@ class RagPipelineTest {
     @Test
     void directoryModeFallsToGuideNameWhenNoExtensions() {
         try (RagPipeline pipeline = new RagPipeline(
-                null, "3.21.0", "https://quarkus.io/guides", 1000)) {
+                null, "3.21.0", "https://quarkus.io/guides", null, 1000)) {
             // getting-started.adoc has no :extensions: attribute
             var chunks = pipeline.processGuide(GUIDES_DIR.resolve("getting-started.adoc"));
 
@@ -97,7 +97,7 @@ class RagPipelineTest {
     @Test
     void resolveSourceNameUsesFixedNameInExtensionMode() {
         try (RagPipeline pipeline = new RagPipeline(
-                "my-extension", "1.0.0", null, 1000)) {
+                "my-extension", "1.0.0", null, null, 1000)) {
             String source = pipeline.resolveSourceName("some-guide", Map.of());
             assertThat(source).isEqualTo("my-extension");
         }
@@ -106,7 +106,7 @@ class RagPipelineTest {
     @Test
     void resolveSourceNameExtractsArtifactIdFromExtensionsMetadata() {
         try (RagPipeline pipeline = new RagPipeline(
-                null, "1.0.0", null, 1000)) {
+                null, "1.0.0", null, null, 1000)) {
             String source = pipeline.resolveSourceName("rest",
                     Map.of("extensions", "io.quarkus:quarkus-rest,io.quarkus:quarkus-rest-jackson"));
             assertThat(source).isEqualTo("quarkus-rest");
@@ -116,7 +116,7 @@ class RagPipelineTest {
     @Test
     void resolveSourceNameHandlesSimpleExtensionNames() {
         try (RagPipeline pipeline = new RagPipeline(
-                null, "1.0.0", null, 1000)) {
+                null, "1.0.0", null, null, 1000)) {
             String source = pipeline.resolveSourceName("rest",
                     Map.of("extensions", "quarkus-rest"));
             assertThat(source).isEqualTo("quarkus-rest");
@@ -126,9 +126,35 @@ class RagPipelineTest {
     @Test
     void resolveSourceNameFallsBackToGuideFilename() {
         try (RagPipeline pipeline = new RagPipeline(
-                null, "1.0.0", null, 1000)) {
+                null, "1.0.0", null, null, 1000)) {
             String source = pipeline.resolveSourceName("getting-started", Map.of());
             assertThat(source).isEqualTo("quarkus-getting-started");
+        }
+    }
+
+    @Test
+    void guideUrlOverridesConstructedUrl() {
+        String customUrl = "https://docs.quarkiverse.io/quarkus-vault/dev/index.html";
+        try (RagPipeline pipeline = new RagPipeline(
+                "quarkus-vault", "1.2.0", "https://quarkus.io/guides", customUrl, 1000)) {
+            var chunks = pipeline.processGuide(TEST_GUIDE);
+
+            assertThat(chunks).isNotEmpty();
+            assertThat(chunks.get(0).metadata()).containsEntry("url", customUrl);
+            // Should NOT contain the constructed quarkus.io URL
+            assertThat(chunks.get(0).metadata().get("url")).doesNotContain("quarkus.io/guides");
+        }
+    }
+
+    @Test
+    void metadataUsesVersionKeyNotQuarkusVersion() {
+        try (RagPipeline pipeline = new RagPipeline(
+                "quarkus-rest", "3.21.0", "https://quarkus.io/guides", null, 1000)) {
+            var chunks = pipeline.processGuide(TEST_GUIDE);
+
+            assertThat(chunks).isNotEmpty();
+            assertThat(chunks.get(0).metadata()).containsEntry("version", "3.21.0");
+            assertThat(chunks.get(0).metadata()).doesNotContainKey("quarkus_version");
         }
     }
 

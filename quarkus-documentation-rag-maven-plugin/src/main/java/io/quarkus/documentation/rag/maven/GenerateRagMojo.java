@@ -73,6 +73,14 @@ public class GenerateRagMojo extends AbstractMojo {
     @Parameter(property = "quarkus-rag.guideBaseUrl", defaultValue = "https://quarkus.io/guides")
     private String guideBaseUrl;
 
+    /**
+     * Full guide URL that overrides the constructed {@code guideBaseUrl + "/" + guideFileName}.
+     * Use this for extensions whose docs live outside {@code quarkus.io/guides}, e.g.
+     * {@code https://docs.quarkiverse.io/quarkus-vault/dev/index.html}.
+     */
+    @Parameter(property = "quarkus-rag.guideUrl")
+    private String guideUrl;
+
     @Parameter(property = "quarkus-rag.outputFile", defaultValue = "${project.build.outputDirectory}/META-INF/quarkus-rag.sql")
     private File outputFile;
 
@@ -104,9 +112,16 @@ public class GenerateRagMojo extends AbstractMojo {
             throw new MojoExecutionException("<guides>/<guide> and <guidesDirectory> are mutually exclusive");
         }
 
+        // Strip -deployment suffix from extensionName (common when configured in deployment modules)
+        String resolvedExtensionName = extensionName;
+        if (resolvedExtensionName != null && resolvedExtensionName.endsWith("-deployment")) {
+            resolvedExtensionName = resolvedExtensionName.substring(0,
+                    resolvedExtensionName.length() - "-deployment".length());
+        }
+
         try (RagPipeline pipeline = new RagPipeline(
-                hasDirectory ? null : extensionName,
-                version, guideBaseUrl, maxChunkSize)) {
+                hasDirectory ? null : resolvedExtensionName,
+                version, guideBaseUrl, guideUrl, maxChunkSize)) {
             if (hasDirectory) {
                 getLog().info("Scanning directory " + guidesDirectory + " for guides (source from metadata)");
                 pipeline.processDirectory(guidesDirectory.toPath(), outputFile.toPath());
@@ -123,7 +138,7 @@ public class GenerateRagMojo extends AbstractMojo {
                     getLog().warn("No valid guide files found — skipping RAG generation");
                     return;
                 }
-                getLog().info("Generating RAG SQL for " + extensionName + " from " + guidePaths.size() + " guide(s)");
+                getLog().info("Generating RAG SQL for " + resolvedExtensionName + " from " + guidePaths.size() + " guide(s)");
                 pipeline.processGuides(guidePaths, outputFile.toPath());
             }
         } catch (IOException e) {

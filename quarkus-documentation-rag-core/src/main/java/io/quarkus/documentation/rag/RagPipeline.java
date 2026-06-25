@@ -40,11 +40,14 @@ public class RagPipeline implements AutoCloseable {
     private final String extensionName;
     private final String version;
     private final String guideBaseUrl;
+    private final String guideUrl;
 
-    public RagPipeline(String extensionName, String version, String guideBaseUrl, int maxChunkSize) {
+    public RagPipeline(String extensionName, String version, String guideBaseUrl, String guideUrl,
+            int maxChunkSize) {
         this.extensionName = extensionName;
         this.version = version;
         this.guideBaseUrl = guideBaseUrl;
+        this.guideUrl = guideUrl;
         this.processor = new AsciiDocProcessor();
         this.splitter = new SemanticSplitter(maxChunkSize);
         this.embeddingGenerator = new EmbeddingGenerator();
@@ -82,7 +85,8 @@ public class RagPipeline implements AutoCloseable {
         List<Chunk> chunks = splitter.split(sections);
 
         String guideFileName = guide.getFileName().toString().replaceFirst("\\.adoc$", "");
-        String url = guideBaseUrl != null ? guideBaseUrl + "/" + guideFileName : null;
+        String url = guideUrl != null ? guideUrl
+                : (guideBaseUrl != null ? guideBaseUrl + "/" + guideFileName : null);
         String resolvedSource = resolveSourceName(guideFileName, adocMetadata);
 
         List<ChunkWithEmbedding> result = new ArrayList<>();

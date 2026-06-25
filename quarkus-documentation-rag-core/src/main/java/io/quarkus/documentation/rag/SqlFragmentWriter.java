@@ -116,7 +116,7 @@ public class SqlFragmentWriter {
             String title, String url, Map<String, String> adocMetadata, SemanticSplitter.Chunk chunk) {
         Map<String, String> metadata = new LinkedHashMap<>();
         metadata.put("source", source);
-        metadata.put("quarkus_version", version);
+        metadata.put("version", version);
         if (title != null) {
             metadata.put("title", title);
         }
